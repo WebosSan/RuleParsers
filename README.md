@@ -1,6 +1,6 @@
-# RuleScript
+# RuleParsers
 
-Rulescript addon with more parsers and printers.
+RuleScript addon with more parsers and printers.
 
 ## New parsers and printers:
 - Lua
