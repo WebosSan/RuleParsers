@@ -1,0 +1,12 @@
+--cwd ./test
+
+--define hscriptPos
+-lib rulescript
+-lib ruleparsers
+
+-cp src
+
+--main Main
+
+--hl export/hl/main.hl
+-cmd hl export/hl/main.hl

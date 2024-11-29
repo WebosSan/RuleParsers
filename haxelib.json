@@ -1,0 +1,12 @@
+{
+  "name": "ruleparsers",
+  "url" : "https://github.com/Kriptel/RuleParsers",
+  "license": "MIT",
+  "description": "RuleScript addon with more parsers and printers.",
+  "version": "0.0.1",
+  "releasenote": "Lua parser",
+  "dependencies": {
+      "rulescript":""
+  },
+  "contributors": ["Kriptel"]
+}
