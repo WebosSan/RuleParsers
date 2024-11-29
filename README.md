@@ -12,12 +12,12 @@ Rulescript addon with more parsers and printers.
 		- [x] Function
 			- [x] elseif
 			- [x] else
-			- [] rest args
-			- [] dot in function name
-		- [] Do While
-		- [] While
-		- [] For
-		- [] Tables
+			- [ ] rest args
+			- [ ] dot in function name
+		- [ ] Do While
+		- [ ] While
+		- [ ] For
+		- [ ] Tables
 		- [x] Parent
 	- [x] Operators
 		- [x] +
@@ -37,8 +37,8 @@ Rulescript addon with more parsers and printers.
 		- [x] or
 		- [x] #
 			- [x] Array
-			- [] Map 
+			- [ ] Map 
 		- [x] ..
-	- [] Std
-		- [] math
-	- [] Table access
+	- [ ] Std
+		- [ ] math
+	- [ ] Table access
