@@ -1,16 +1,8 @@
-
-a = 'hello world'
-
-local b = 'Hello World'
-
-function f(c)
-	if c then
-		trace('hx');
-		return 'rulescript'
-	elseif c == 0 then
-		return 'rulescript: 0'
-	else
-		return 'Rulescript'
+a = 3
+if a < 1 then
+    print("less")
+elseif a < 4 then
+    print("ok")
+else
+    print("huge")
 end
-
-trace(f(true));

@@ -1,8 +1,6 @@
 --cwd ./test
-
---define hscriptPos
--lib rulescript
--lib ruleparsers
+--library rulescript
+--library ruleparsers
 
 -cp src
 

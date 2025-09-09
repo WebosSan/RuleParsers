@@ -1,5 +1,9 @@
 package;
 
+import rulescript.std.lua.LuaMath;
+import rulescript.interps.RuleScriptInterp;
+import rulescript.interps.BytecodeInterp;
+import haxe.Log;
 import hscript.Printer;
 import rulescript.*;
 import rulescript.parsers.*;
@@ -17,31 +21,21 @@ class Main
 
 	static function main():Void
 	{
-		trace('Testing Commands:');
-
-		script = new RuleScript(new LuaParser());
+		script = new RuleScript(new RuleScriptInterp(), new LuaParser());
 
 		runScript('Script.lua');
-
-		Sys.println('\n	
-	Tests: $callNum,
-	Errors: $errorsNum
-		');
 	}
 
 	static function runScript(path:String)
 	{
 		// Reset package, for reusing package keyword
-		script.interp.scriptPackage = '';
+		script.scriptPackage = '';
 
 		var code:String = File.getContent('scripts/' + path);
 
 		var expr = script.parser.parse(code);
 
-		Sys.println('[Running code #${++callNum}]: "\n$code\n"\n');
-		Sys.println('[to hx]: \n${new Printer().exprToString(expr)}\n');
 		Sys.println('\n[Result]: \n\t${script.tryExecute(expr)}\n');
-		Sys.println('[Print]: "\n${LuaPrinter.print(expr)}\n"\n');
 	}
 
 	static function onError(e:haxe.Exception):Dynamic
