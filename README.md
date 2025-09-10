@@ -13,11 +13,11 @@ RuleScript addon with more parsers and printers.
 			- [x] elseif
 			- [x] else
 			- [ ] rest args
-			- [ ] dot in function name
-		- [ ] Do While
-		- [ ] While
-		- [ ] For
-		- [ ] Tables
+			- [x] dot in function name
+		- [x] Do While
+		- [x] While
+		- [x] For (kinda)
+		- [x] Tables
 		- [x] Parent
 	- [x] Operators
 		- [x] +
@@ -39,6 +39,6 @@ RuleScript addon with more parsers and printers.
 			- [x] Array
 			- [ ] Map 
 		- [x] ..
-	- [ ] Std
-		- [ ] math
-	- [ ] Table access
+	- [x] Std
+		- [x] math
+	- [x] Table access
