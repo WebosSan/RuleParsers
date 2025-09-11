@@ -1,0 +1,8 @@
+let aea = 2
+
+switch aea {
+    case 1:
+        trace("aea")
+    default:
+        trace("angaga")
+}

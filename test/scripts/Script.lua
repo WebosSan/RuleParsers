@@ -1,8 +1,14 @@
-a = 3
-if a < 1 then
-    print("less")
-elseif a < 4 then
-    print("ok")
-else
-    print("huge")
+--Comment test
+local str = "String"
+
+local num = 1
+local float = 1.5
+
+print(#str, #num, #float)
+
+local obj = {}
+obj.name = "Jonas"
+obj.greet = function (self)
+    print("Hello " + self.name)
+    return nil
 end

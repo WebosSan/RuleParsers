@@ -23,13 +23,16 @@ class Main
 	{
 		script = new RuleScript(new RuleScriptInterp(), new LuaParser());
 
-		runScript('Script.lua');
+		runScript('Script.lua', new LuaParser());
+		runScript('Script.clear', new ClearParser());
 	}
 
-	static function runScript(path:String)
+	static function runScript(path:String, parser:Parser)
 	{
-		// Reset package, for reusing package keyword
-		script.scriptPackage = '';
+		Sys.println('[Init]: Reading $path\n');
+
+		script.scriptPackage = path;
+		script.parser = parser;
 
 		var code:String = File.getContent('scripts/' + path);
 

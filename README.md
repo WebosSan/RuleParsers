@@ -16,7 +16,7 @@ RuleScript addon with more parsers and printers.
 			- [x] dot in function name
 		- [x] Do While
 		- [x] While
-		- [x] For (kinda)
+		- [x] For
 		- [x] Tables
 		- [x] Parent
 	- [x] Operators

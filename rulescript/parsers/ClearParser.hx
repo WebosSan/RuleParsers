@@ -1,12 +1,7 @@
 package rulescript.parsers;
 
-import rulescript.utils.lua.LuaUtils;
 import haxe.ds.GenericStack;
 import hscript.Expr;
-import rulescript.interps.BytecodeInterp;
-import rulescript.printers.LuaPrinter;
-import rulescript.std.lua.LuaMath;
-import rulescript.std.lua.iterators.LuaNumberIterator;
 
 using rulescript.Tools;
 
@@ -28,7 +23,7 @@ private enum Token {
 	TDoubleDot;
 }
 
-class LuaParser extends Parser {
+class ClearParser extends Parser {
 	public var opChars:String;
 	public var identChars:String;
 	public var opPriority:Map<String, Int>;
@@ -39,20 +34,6 @@ class LuaParser extends Parser {
 
 	public function new() {
 		super();
-		RuleScript.defaultImports.get('').set("math", LuaMath);
-		RuleScript.defaultImports.get('').set("nil", null);
-		RuleScript.defaultImports.get('').set("LuaNumberIterator", LuaNumberIterator);
-		RuleScript.defaultImports.get('').set("LuaUtils", LuaUtils);
-		RuleScript.defaultImports.get('').set('print', Reflect.makeVarArgs((f) -> {
-			#if sys
-			Sys.println(f.join(", "));
-			#end
-
-			#if js
-			js.Browser.console.log(f.join(", "));
-			#end
-		}));
-
 		opChars = "+*/-=!><&|^%~";
 		identChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
 		opPriority = [];
@@ -66,7 +47,9 @@ class LuaParser extends Parser {
 			["..."],
 			["&&"],
 			["||"],
-			["="]
+			["=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", ">>>=", "|=", "&=", "^=", "=>"],
+			["->"],
+			["in", "is"]
 		];
 		opPriority = new Map();
 		for (i in 0...priorities.length)
@@ -113,7 +96,6 @@ class LuaParser extends Parser {
 				parseExprNext(parseIdent(id));
 			case TBkOpen:
 				var args:Array<{name:String, e:Expr}> = [];
-				var current:Int = 0;
 				while (true) {
 					var tk = token();
 					switch (tk) {
@@ -121,26 +103,37 @@ class LuaParser extends Parser {
 							break;
 						case TId(id):
 							var arg:{name:String, e:Expr} = {name: id, e: null};
-							ensureToken(TOp("="));
-							arg.e = parseExpr();
-							args.push(arg);
-						case TBOpen:
-							var arg:{name:String, e:Expr} = {name: Std.string(new BytecodeInterp().execute(parseExpr())), e: null};
-							ensureToken(TBClose);
-							ensureToken(TOp("="));
+							ensureToken(TDoubleDot);
 							arg.e = parseExpr();
 							args.push(arg);
 						case TComma:
 							continue;
 						default:
-							push(tk);
-							var arg:{name:String, e:Expr} = {name: Std.string(current), e: parseExpr()};
-							trace(arg);
-							args.push(arg);
+							throw unexpected(tk);
 					}
-					current++;
 				}
 				EObject(args);
+
+			case TBOpen:
+				var a = new Array();
+				tk = token();
+				var first = true;
+				while (tk != TBClose) {
+					if (!first) {
+						if (tk != TComma)
+							unexpected(tk);
+						else {
+							tk = token();
+							if (tk == TBClose)
+								break;
+						}
+					}
+					first = false;
+					push(tk);
+					a.push(parseExpr());
+					tk = token();
+				}
+				return parseExprNext(mk(EArrayDecl(a)));
 			case TOp('-'):
 				var e = parseExpr();
 				if (e == null)
@@ -153,9 +146,6 @@ class LuaParser extends Parser {
 					default:
 						return mk(EUnop('-', true, e));
 				}
-			case TOp('#'):
-				var name:Expr = parseExpr();
-				return ECall(EField(EIdent('LuaUtils'), 'getLength'), [name]);
 			case TOp('not'):
 				mk(EUnop('!', true, parseExpr()));
 			case TPOpen:
@@ -193,49 +183,10 @@ class LuaParser extends Parser {
 
 				return parseExprNext(mk(ECall(e1, args)));
 			case TBOpen:
-				var inner:String = null;
-				var i:Expr = null;
-				var tk = token();
-
-				switch (tk) {
-					case TId(id):
-						push(tk);
-						i = parseExpr();
-					case TConst(c):
-						inner = Std.string(c.getParameters()[0]);
-					default:
-						throw "lua error";
-				}
+				var index:Expr = parseExpr();
 				ensureToken(TBClose);
+				return parseExprNext(EArray(e1, index));
 
-				var exp  = parseExprNext(mk(EField(e1, inner)));
-
-				return ECall(EField(EIdent('LuaUtils'), 'getValue'), [exp.getParameters()[0], if (i != null) i else EConst(CString(exp.getParameters()[1]))]);
-
-			case TDoubleDot:
-				var field = getIdent();
-				ensureToken(TPOpen);
-
-				var args = [e1];
-				while (true) {
-					var tk = token();
-					if (tk == TPClose)
-						break;
-					else
-						push(tk);
-
-					var expr:Expr = parseExpr();
-
-					if (expr != null)
-						args.push(expr);
-				}
-
-				maybe(TSemicolon);
-				var expr:Expr = parseExprNext(mk(ECall(EField(e1, field), args)));
-
-				trace(expr);
-
-				return expr;
 			case TDot:
 				var field = getIdent();
 				return parseExprNext(mk(EField(e1, field)));
@@ -246,126 +197,102 @@ class LuaParser extends Parser {
 		});
 	}
 
-	function parseBlock(enders:Array<String>, ?deleteOnEnd:Bool = true):Array<Expr> {
-		var e:Array<Expr> = [];
-
-		while (true) {
-			var tk = token();
-			switch (tk) {
-				case TId(_id):
-					if (enders.contains(_id)) {
-						if (!deleteOnEnd)
-							push(tk);
-						break;
-					}
-				default:
-			}
-			push(tk);
-
-			e.push(parseExpr());
-		}
-
-		return e;
-	}
-
-	function parseElif(cond:Expr, target:Array<Expr>, ?seen:Expr) {
-		if (seen == null)
-			seen = cond;
-
-		var elseifcond = parseExpr();
-		ensureToken(TId('then'));
-
-		target.push(EIf(EBinop("&&", EUnop("!", true, cond), elseifcond), EBlock(parseBlock(["end", "elseif", "else"], false)), null));
-
-		seen = EBinop("||", seen, elseifcond);
-
-		var tk = token();
-		switch (tk) {
-			case TId(id):
-				if (id == "elseif") {
-					parseElif(cond, target, seen);
-				} else if (id == "else") {
-					target.push(EIf(EUnop("!", true, seen), EBlock(parseBlock(["end"])), null));
-				} else if (id == "end") {
-				} else {
-					unexpected(tk);
-				}
-			default:
-				unexpected(tk);
-		}
-	}
-
 	function parseIdent(id:String):Expr {
 		return mk(switch (id) {
-			case 'if':
+			case "if":
 				var cond = parseExpr();
-
-				ensureToken(TId('then'));
-
-				var e:Array<Expr> = [EIf(cond, EBlock(parseBlock(["end", "elseif", "else"], false)), null)];
-
+				var e1 = parseBlock();
+				var e2 = null;
+				var semic = false;
 				var tk = token();
-
-				switch (tk) {
-					case TId(id):
-						switch (id) {
-							case "end":
-							case "elseif":
-								parseElif(cond, e);
-							case "else":
-								e.push(EIf(EUnop("!", true, cond), EBlock(parseBlock(["end"]))));
-							default:
-								unexpected(tk);
-						}
-					default:
-						unexpected(tk);
+				if (tk == TSemicolon) {
+					semic = true;
+					tk = token();
 				}
-
-				EBlock(e);
+				if (Type.enumEq(tk, TId("else")))
+					e2 = parseBlock();
+				else {
+					push(tk);
+					if (semic)
+						push(TSemicolon);
+				}
+				mk(EIf(cond, e1, e2));
 			case 'while':
 				var cond = parseExpr();
 
-				ensureToken(TId('do'));
+				EWhile(cond, parseBlock());
 
-				var e:Array<Expr> = [];
-
-				while (true) {
-					var tk = token();
-					switch (tk) {
-						case TId(_id):
-							switch (_id) {
-								case 'end':
+				case "switch":
+					var e = parseExpr();
+					var def = null, cases = [];
+					ensure(TBkOpen);
+					while( true ) {
+						var tk = token();
+						switch( tk ) {
+						case TId("case"):
+							var c = { values : [], expr : null };
+							cases.push(c);
+							while( true ) {
+								var e = parseExpr();
+								c.values.push(e);
+								tk = token();
+								switch( tk ) {
+								case TComma:
+									// next expr
+								case TDoubleDot:
 									break;
-							}
-						default:
-					}
-					push(tk);
-
-					e.push(parseExpr());
-				}
-
-				EWhile(cond, mk(EBlock(e)));
-			case 'repeat':
-				var e:Array<Expr> = [];
-
-				while (true) {
-					var tk = token();
-					switch (tk) {
-						case TId(_id):
-							switch (_id) {
-								case 'until':
+								default:
+									unexpected(tk);
 									break;
+								}
 							}
+							var exprs = [];
+							while( true ) {
+								tk = token();
+								push(tk);
+								switch( tk ) {
+								case TId("case"), TId("default"), TBkClose:
+									break;
+								default:
+									exprs = parseBlock().getParameters()[0];
+								}
+							}
+							c.expr = if( exprs.length == 1)
+								exprs[0];
+							else if( exprs.length == 0 )
+								EBlock([]);
+							else
+								mk(EBlock(exprs));
+						case TId("default"):
+							if( def != null ) unexpected(tk);
+							ensure(TDoubleDot);
+							var exprs = [];
+							while( true ) {
+								tk = token();
+								push(tk);
+								switch( tk ) {
+								case TId("case"), TId("default"), TBkClose:
+									break;
+								default:
+									exprs = parseBlock().getParameters()[0];
+								}
+							}
+							def = if( exprs.length == 1)
+								exprs[0];
+							else if( exprs.length == 0 )
+								EBlock([]);
+							else
+								mk(EBlock(exprs));
+						case TBkClose:
+							break;
 						default:
+							unexpected(tk);
+							break;
+						}
 					}
-					push(tk);
+					mk(ESwitch(e, cases, def));
 
-					e.push(parseExpr());
-				}
-				var cond = parseExpr();
-				EDoWhile(EUnop("!", true, cond), mk(EBlock(e)));
-
-			case 'function':
+			case 'func':
 				var name:String = null;
 				var tk = token();
 
@@ -385,102 +312,68 @@ class LuaParser extends Parser {
 					switch (tk) {
 						case TId(id):
 							args.push({name: id});
+							tk = token();
+							if (tk.equals(TDoubleDot)) token(); else push(tk);
 						case TPClose:
 							break;
 						default:
 					}
 				}
 
-				var e:Array<Expr> = [];
-
-				while (true) {
-					var tk = token();
-					switch (tk) {
-						case TId(_id):
-							switch (_id) {
-								case 'end':
-									break;
-							}
-						default:
-					}
-					push(tk);
-
-					e.push(parseExpr());
-				}
-
-				EFunction(args, mk(EBlock(e)), name, null);
+				EFunction(args, mk(parseBlock()), name, null);
 			case 'for':
+				var id:String = getIdent();
+				ensureToken(TId("in"));
+				var it:Expr = parseExpr();
+				EFor(id, it, parseBlock());
+			case 'let', 'const':
 				var name:String = getIdent();
-				var tk = token();
+				var tk:Token = token();
 				switch (tk) {
-					case TOp("="):
-						var initialValue:Expr = parseExpr();
-						var step:Expr = EConst(CInt(1));
-						ensureToken(TComma);
-						var finalValue:Expr = parseExpr();
-
-						var tkk = token();
-
-						trace(finalValue);
-
-						switch (tkk) {
-							case TComma:
-								step = parseExpr();
-							default:
-								push(tkk);
-						}
-
-						ensureToken(TId("do"));
-
-						var e:Array<Expr> = [];
-
-						while (true) {
-							var tk = token();
-							switch (tk) {
-								case TId(_id):
-									switch (_id) {
-										case 'end':
-											break;
-									}
-								default:
-							}
-							push(tk);
-
-							e.push(parseExpr());
-						}
-
-						return EFor(name, ECall(EField(EIdent('LuaNumberIterator'), 'createInstance'), [initialValue, finalValue, step]), EBlock(e));
+					case TDoubleDot:
+						token();
 					default:
 						push(tk);
 				}
-				return null;
-			case 'return':
-				EReturn(parseExpr());
-			default:
-				var global = id != 'local';
-				var access = false;
 
-				if (!global)
-					id = getIdent();
+				tk = token();
 
-				switch (token()) {
-					case TDoubleDot:
-						token();
-					case tk:
-						push(tk);
+				var expr:Expr = null;
+
+				switch (tk) {
+					case TOp("="):
+						expr = EVar(name, null, parseExpr(), null, id == "const");
+					default:
+						expr = EVar(name, null, EIdent("null"), null, id == "const");
 				}
-
-				switch (token()) {
-					case TOp('='):
-						if (!global) return mk(EVar(id, null, parseExpr(), false)); else return makeBinop('=', mk(EIdent(id)), parseExpr());
-					case tk:
-						push(tk);
-				}
-
 				maybe(TSemicolon);
-
-				EIdent(id);
+				expr;
+			case _:
+				return EIdent(id);
 		});
+	}
+
+	function parseBlock():Expr {
+		var isBigBlock:Bool = maybe(TBkOpen);
+		var exprs:Array<Expr> = [];
+
+		if (!isBigBlock)
+			exprs.push(parseExpr());
+		else {
+			while (true) {
+				var tk:Token = token();
+				switch (tk) {
+					case TBkClose:
+						break;
+					default:
+						push(tk);
+				}
+
+				exprs.push(parseExpr());
+			}
+		}
+
+		return EBlock(exprs);
 	}
 
 	function makeBinop(op:String, e1:Expr, e:Expr) {
@@ -660,6 +553,11 @@ class LuaParser extends Parser {
 					this.char = char;
 					return TOp('-');
 				case '+'.code, '*'.code, '/'.code, '%'.code:
+					var nextChar:String;
+					if (opPriority.exists(String.fromCharCode(char) + (nextChar = String.fromCharCode(readChar())))) {
+						return TOp(String.fromCharCode(char) + nextChar);
+					}
+					pos--;
 					return TOp(String.fromCharCode(char));
 				case '>'.code:
 					char = readChar();
@@ -677,8 +575,6 @@ class LuaParser extends Parser {
 
 					this.char = char;
 					return TOp("<");
-				case '#'.code:
-					return TOp('#');
 				default:
 					if (idents[char]) {
 						var id = String.fromCharCode(char);
