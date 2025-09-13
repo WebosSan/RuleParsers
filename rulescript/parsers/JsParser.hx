@@ -35,6 +35,8 @@ class JsParser extends Parser {
 	var idents:Array<Bool>;
 	var ops:Array<Bool>;
 
+	var unaries:Array<String> = [];
+
 	public function new() {
 		super();
 		opChars = "+*/-=!><&|^%~";
@@ -43,26 +45,29 @@ class JsParser extends Parser {
 		var priorities = [
 			["()", "[]", ".", "?."],
 			["++", "--", "+", "-", "~", "!", "typeof", "void", "delete"],
-			["**"], // exponenciación (derecha a izquierda)
-			["*", "/", "%"], // multiplicativos
-			["+", "-"], // aditivos
-			["<<", ">>", ">>>"], // desplazamientos
-			["<", "<=", ">", ">=", "in", "instanceof"], // relacionales
-			["==", "!=", "===", "!=="], // igualdad
-			["&"], // AND bit a bit
-			["^"], // XOR bit a bit
-			["|"], // OR bit a bit
-			["&&"], // AND lógico
-			["||"], // OR lógico
-			["??"], // Nullish coalescing
-			["?:"], // condicional ternario
+			["**"], 
+			["*", "/", "%"],
+			["+", "-"], 
+			["<<", ">>", ">>>"], 
+			["<", "<=", ">", ">=", "in", "instanceof"],
+			["==", "!=", "===", "!=="], 
+			["&"], 
+			["^"], 
+			["|"], 
+			["&&"], 
+			["||"], 
+			["??"], 
+			["?:"], 
 			[
 				"=", "+=", "-=", "*=", "/=", "%=", "**=", "<<=", ">>=", ">>>=", "&=", "^=", "|=", "&&=", "||=", "??="
-			], // asignaciones
-			["yield", "yield*"], // yield
-			["=>"], // arrow functions
-			[","], // coma (secuencia)
+			], 
+			["yield", "yield*"], 
+			["=>"], 
+			[","], 
 		];
+
+		unaries = ["++", "--"];
+
 		opPriority = new Map();
 		for (i in 0...priorities.length)
 			for (x in priorities[i]) {
@@ -170,7 +175,7 @@ class JsParser extends Parser {
 					default:
 						return mk(EUnop('-', true, e));
 				}
-			case TOp('not'):
+			case TOp('!'):
 				mk(EUnop('!', true, parseExpr()));
 			case TPOpen:
 				push(tk);
@@ -201,6 +206,9 @@ class JsParser extends Parser {
 		var tk = token();
 		return mk(switch (tk) {
 			case TOp(op):
+				if (unaries.contains(op)){
+					return EUnop(op, false, e1);
+				}
 				if (op == "in") {
 					var arr:Expr = parseExpr();
 					return ECall(EField(arr, "contains"), [e1]);

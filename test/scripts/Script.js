@@ -7,3 +7,9 @@ import { Local } from "Local"
 
     trace(Local.sum(10, 53))
 })("Jonas :)")
+
+let a = 0
+while (a != 3) {
+    a++
+    trace(a)
+}
